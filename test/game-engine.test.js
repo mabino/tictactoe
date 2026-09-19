@@ -9,7 +9,10 @@ import {
   parseLLMMoveResponse,
   buildMovePrompt,
   buildChatPrompt,
-  buildEndGamePrompt
+  buildEndGamePrompt,
+  POSITION_NAMES,
+  formatMoveDescription,
+  sanitizeTrashTalk
 } from '../src/game-engine.js';
 
 describe('Game Engine - Board & Win Conditions', () => {
@@ -122,18 +125,75 @@ describe('LLM Response Parsing & Validation', () => {
   });
 });
 
+describe('Spatial Position Naming', () => {
+  test('correctly names all 9 board positions', () => {
+    assert.equal(POSITION_NAMES.length, 9);
+    assert.equal(formatMoveDescription(0), 'top-left corner');
+    assert.equal(formatMoveDescription(4), 'the center');
+    assert.equal(formatMoveDescription(8), 'bottom-right corner');
+  });
+
+  test('falls back gracefully for invalid indices', () => {
+    assert.equal(formatMoveDescription(-1), 'the board');
+    assert.equal(formatMoveDescription(99), 'the board');
+    assert.equal(formatMoveDescription(null), 'the board');
+  });
+});
+
+describe('Trash Talk Sanitizer & Anti-Loop Guardrails', () => {
+  test('strips surrounding quotation marks', () => {
+    assert.equal(sanitizeTrashTalk('"Seven nines of trash, for you!"'), 'Seven nines of trash, for you!');
+    assert.equal(sanitizeTrashTalk("'You are going down'"), 'You are going down');
+  });
+
+  test('strips roleplay asterisks and parentheticals', () => {
+    const raw = ':P "You\'re going down!" *only slightly more jovial smile*';
+    const cleaned = sanitizeTrashTalk(raw);
+    assert.equal(cleaned, "You're going down!");
+  });
+
+  test('strips bracketed tags like [Scope: None]', () => {
+    const raw = '[Scope: None] Taking your corner now!';
+    const cleaned = sanitizeTrashTalk(raw);
+    assert.equal(cleaned, 'Taking your corner now!');
+  });
+
+  test('collapses duplicate repeating sentences', () => {
+    const raw = 'I can beat you! I can beat you! I can beat you!';
+    const cleaned = sanitizeTrashTalk(raw);
+    assert.equal(cleaned, 'I can beat you!');
+  });
+
+  test('detects and cleans repetitive degenerate loops', () => {
+    const raw = ':D "Oh, I can beat you! " :200 :) :D *:D "I can beat you!" :1200 :)';
+    const cleaned = sanitizeTrashTalk(raw);
+    assert.ok(cleaned.length > 0);
+    assert.ok(!cleaned.includes(':200'));
+    assert.ok(!cleaned.includes('*:D'));
+  });
+
+  test('returns fallback for empty or nonsense strings', () => {
+    const fallbackList = ['Fallback response'];
+    assert.equal(sanitizeTrashTalk('', fallbackList), 'Fallback response');
+    assert.equal(sanitizeTrashTalk('[Scope: None]', fallbackList), 'Fallback response');
+    assert.equal(sanitizeTrashTalk(':D :P', fallbackList), 'Fallback response');
+    assert.equal(sanitizeTrashTalk(null, fallbackList), 'Fallback response');
+  });
+});
+
 describe('Prompt Construction', () => {
-  test('buildMovePrompt returns valid schema and instructions', () => {
+  test('buildMovePrompt returns valid schema and spatial instructions', () => {
     const board = ['X', null, null, null, null, null, null, null, null];
     const prompts = buildMovePrompt(board, [1, 2, 3, 4, 5, 6, 7, 8], 0);
     assert.equal(prompts.length, 2);
     assert.equal(prompts[0].role, 'system');
     assert.equal(prompts[1].role, 'user');
     assert.match(prompts[0].content, /JSON/);
-    assert.match(prompts[1].content, /square 0/);
+    assert.match(prompts[0].content, /NEVER mention coordinate numbers/);
+    assert.match(prompts[1].content, /top-left corner/);
   });
 
-  test('buildChatPrompt includes message history', () => {
+  test('buildChatPrompt includes few-shot examples and clean history', () => {
     const history = [
       { sender: 'user', text: 'Hey there' },
       { sender: 'ai', text: 'Prepare to lose!' }
@@ -141,11 +201,13 @@ describe('Prompt Construction', () => {
     const board = Array(9).fill(null);
     const prompts = buildChatPrompt('Are you ready?', board, history);
     assert.equal(prompts.length, 4); // system + 2 history + new user message
+    assert.match(prompts[0].content, /Examples of great retorts/);
     assert.match(prompts[3].content, /Are you ready\?/);
   });
 
-  test('buildEndGamePrompt formats win outcome correctly', () => {
+  test('buildEndGamePrompt formats outcome without numbers', () => {
     const prompts = buildEndGamePrompt('ai_win', ['O', 'O', 'O', 'X', 'X', null, null, null, null]);
-    assert.match(prompts[1].content, /won against Human/);
+    assert.match(prompts[0].content, /NEVER mention cell numbers/);
+    assert.match(prompts[1].content, /defeated the Human/);
   });
 });

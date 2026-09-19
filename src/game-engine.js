@@ -8,45 +8,169 @@ export const WINNING_LINES = [
   [0, 4, 8], [2, 4, 6]             // Diagonals
 ];
 
+export const POSITION_NAMES = [
+  'top-left corner',
+  'top edge',
+  'top-right corner',
+  'left edge',
+  'the center',
+  'right edge',
+  'bottom-left corner',
+  'bottom edge',
+  'bottom-right corner'
+];
+
+/**
+ * Returns human-readable board position description.
+ * @param {number} index 0-8
+ * @returns {string}
+ */
+export function formatMoveDescription(index) {
+  if (typeof index !== 'number' || index < 0 || index >= POSITION_NAMES.length) {
+    return 'the board';
+  }
+  return POSITION_NAMES[index];
+}
+
 export const DEFAULT_CONFIG = {
   apiEndpoint: 'http://127.0.0.1:8000/v1/chat/completions',
   model: 'mlx-community/Qwen3.8-27B-4bit',
   timeoutMs: 7000,
-  enableThinking: false
+  enableThinking: false,
+  temperature: 0.7,
+  frequency_penalty: 0.7,
+  presence_penalty: 0.5,
+  max_tokens: 45
 };
 
 export const FALLBACK_TAKING_BREAK_MESSAGES = [
-  "[Taking a break] My neural network is offline right now, but I still made my move with Minimax!",
-  "[Taking a break] Connection taking a breather! Minimax mode engaged.",
-  "[Taking a break] Server is offline, but don't think that makes your board safe!",
-  "[Taking a break] My high-powered brain is resting, but my offline heuristic will handle you just fine."
+  "Calculated move to dismantle your strategy.",
+  "Setting up an inescapable trap. Your turn!",
+  "Taking optimal position. Don't blink!",
+  "Predictable move from a carbon-based lifeform.",
+  "My heuristics say you're in trouble now.",
+  "Corner secured. Let's see your response.",
+  "Step into my parlor, said the spider to the fly."
 ];
 
 export const FALLBACK_USER_CHAT_RESPONSES = [
-  "[Taking a break] AI server is offline right now, but I still see every mistake you make on that board.",
-  "[Taking a break] Offline mode active — save the excuses for when you lose!",
-  "[Taking a break] Less chatting, more losing!",
-  "[Taking a break] I'd reply with deep prose, but beating you offline doesn't require high compute.",
-  "[Taking a break] Keep talking, it won't save your corner."
+  "Less chatting, more losing!",
+  "Save the excuses for the post-game summary.",
+  "I see every flaw in your grid from here.",
+  "Bold words for someone with an exposed corner.",
+  "Keep talking, it won't stop the inevitable.",
+  "My algorithms are thoroughly unimpressed.",
+  "Talk is cheap, but moves on this board are expensive.",
+  "Are you always this confident before walking into a trap?"
 ];
 
 export const FALLBACK_ENDGAME_COMMENTS = {
   ai_win: [
-    "Checkmate! Wait, wrong game, but you still lost.",
-    "Calculated to perfection. Better luck next time!",
-    "Another victory for silicon over carbon."
+    "Checkmate! Wrong game, but you still lost.",
+    "Calculated to absolute perfection. Better luck next time!",
+    "Another flawless victory for silicon over carbon.",
+    "Flawless match. Would you like another lesson in geometry?",
+    "Math wins again. Don't feel too bad about it."
   ],
   human_win: [
-    "Beginner's luck. I demand a rematch!",
-    "Enjoy your fleeting moment in the sun!",
-    "Must have been a cosmic ray flip. Won't happen again."
+    "A solar flare clearly flipped a bit in my logic gate! Rematch now.",
+    "Beginner's luck. Enjoy your fleeting glory!",
+    "A minor anomaly. I demand an immediate rematch.",
+    "You got lucky that turn. It won't happen twice."
   ],
   draw: [
-    "A stalemate... you survived this round.",
-    "A draw? I call that a tactical mercy.",
-    "Gridlock. Let's see if you can do better next round."
+    "A stalemate... you survived this round by the skin of your teeth.",
+    "A draw? I consider that tactical mercy on my part.",
+    "Gridlock! Neither of us yielded an inch.",
+    "You managed to not lose. Congratulations on surviving!"
   ]
 };
+
+/**
+ * Strips quotes, roleplay asterisks, emoji loops, bracketed tags, and collapses repetition.
+ * @param {string} text Raw model output
+ * @param {string[]} fallbackList Optional fallback list if output is degenerate
+ * @returns {string} Cleaned, punchy retort
+ */
+export function sanitizeTrashTalk(text, fallbackList = FALLBACK_USER_CHAT_RESPONSES) {
+  if (!text || typeof text !== 'string') {
+    return getRandomFallback(fallbackList);
+  }
+
+  let cleaned = text.trim();
+
+  // Strip code blocks / markdown tags if present
+  cleaned = cleaned.replace(/```(?:json)?[\s\S]*?```/g, '');
+  cleaned = cleaned.replace(/`([^`]+)`/g, '$1');
+
+  // Strip bracketed metadata like [Scope: None], [Minimax Mode], [Taking a break]
+  cleaned = cleaned.replace(/\[[^\]]*\]/g, '');
+
+  // Strip roleplay asterisks like *smiles*, *chuckles*, *laughs*
+  cleaned = cleaned.replace(/\*[^*]*\*/g, '');
+
+  // Strip roleplay parentheticals like (smiles), (laughs)
+  cleaned = cleaned.replace(/\([^)]*(?:smile|laugh|giggle|grin|sigh|chuckle)[^)]*\)/gi, '');
+
+  // Strip token / number artifact leaks like :200, :1200, etc.
+  cleaned = cleaned.replace(/:\d+/g, '');
+
+  // Strip emoticons (like :D, :P, :), *;D, etc.) anywhere in the string
+  cleaned = cleaned.replace(/[:;=8][\-o\*\']?[)D\]P(\/@\\Opo]/gi, '');
+
+  // Strip remaining asterisks, backticks, hashes
+  cleaned = cleaned.replace(/[*_#]/g, '');
+
+  // Strip surrounding quotes
+  cleaned = cleaned.replace(/^["'`“]+|["'`”]+$/g, '').trim();
+
+  // Remove repeated quotes inside text if wrapped like: "Hello"
+  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+
+  // Detect and collapse repeating sentences (e.g. "I can beat you! I can beat you!")
+  const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean);
+  if (sentences.length > 0) {
+    const uniqueSentences = [];
+    for (const s of sentences) {
+      const normalized = s.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normalized && !uniqueSentences.some(u => u.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized)) {
+        uniqueSentences.push(s.replace(/^["'`“]+|["'`”]+$/g, '').trim());
+      }
+    }
+    cleaned = uniqueSentences.slice(0, 2).join(' ');
+  }
+
+  // Collapse repeated punctuation like !!!!! or ?????
+  cleaned = cleaned.replace(/([!?.])\1{2,}/g, '$1');
+  cleaned = cleaned.replace(/([^\w\s])\1{2,}/g, '$1');
+
+  // Strip excessive emojis (limit to max 2)
+  const emojiRegex = /[\p{Extended_Pictographic}\u{1F300}-\u{1FAFF}]/gu;
+  let emojiCount = 0;
+  cleaned = cleaned.replace(emojiRegex, (match) => {
+    emojiCount++;
+    return emojiCount <= 2 ? match : '';
+  });
+
+  // Final trim
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  // Check for repetitive degeneracy like ":200 :)" or length < 4 or nonsense characters only
+  if (cleaned.length < 4 || /^[:\-\d\s*~=()]+$/.test(cleaned)) {
+    return getRandomFallback(fallbackList);
+  }
+
+  return cleaned;
+}
+
+function getRandomFallback(list) {
+  if (Array.isArray(list) && list.length > 0) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  return "Your move.";
+}
 
 /**
  * Checks the board for a winner.
@@ -196,30 +320,30 @@ export function parseLLMMoveResponse(rawContent, availableMoves) {
  * Builds the LLM prompt messages for making an AI move.
  */
 export function buildMovePrompt(board, availableMoves, lastPlayerMove = null, aiSymbol = 'O', humanSymbol = 'X') {
-  const formattedBoard = board.map((v, i) => v === null ? `${i}` : v);
-  const boardAscii = `
- ${formattedBoard[0]} | ${formattedBoard[1]} | ${formattedBoard[2]}
----+---+---
- ${formattedBoard[3]} | ${formattedBoard[4]} | ${formattedBoard[5]}
----+---+---
- ${formattedBoard[6]} | ${formattedBoard[7]} | ${formattedBoard[8]}
-`.trim();
+  const lastMoveDesc = lastPlayerMove !== null ? formatMoveDescription(lastPlayerMove) : null;
+  const availableDescs = availableMoves.map(i => `${i} (${POSITION_NAMES[i]})`).join(', ');
 
-  const systemPrompt = `You are a witty, boastful, trash-talking Tic-Tac-Toe AI champion playing as '${aiSymbol}'.
-You are playing against a human '${humanSymbol}'.
-Board indices are 0-8.
-Always pick a valid integer move from the Available moves list.
-Respond ONLY with a valid JSON object in this exact schema:
-{"move": <integer 0-8>, "comment": "<1 short, snappy, boastful or witty trash-talk comment about the move>"}
-Do not include extra explanations or markdown outside the JSON.`;
+  const systemPrompt = `You are a witty, boastful, competitive Tic-Tac-Toe AI champion playing as '${aiSymbol}'.
+You are playing against a human opponent playing as '${humanSymbol}'.
 
-  const userPrompt = `Current board state:
-${boardAscii}
+CRITICAL RULES:
+1. Always pick a valid move index from the Available moves list.
+2. In your comment, NEVER mention coordinate numbers, square numbers, cell indices, or array numbers (do NOT say "square 4" or "move 0"). Instead, use natural words like "the center", "that corner", or "the edge".
+3. Keep your trash talk to exactly 1 short, punchy, hilarious sentence (under 15 words).
+4. Do NOT wrap your comment in quotation marks. Do NOT include stage directions or asterisks (*smiles*).
+5. Respond ONLY with a valid JSON object in this exact schema:
+{"move": <integer 0-8>, "comment": "<1 short, punchy trash-talk sentence>"}
 
-Board array: ${JSON.stringify(board)}
-Available moves: ${JSON.stringify(availableMoves)}
-${lastPlayerMove !== null ? `Human '${humanSymbol}' just played at square ${lastPlayerMove}.` : `It is your turn.`}
-Choose your winning or blocking move and trash talk your opponent!`;
+Few-shot examples of good trash talk:
+- "Taking the center because I know you can't defend both flanks."
+- "You left that corner wide open—amateur hour already?"
+- "Blocking your line before you even realized you had one."
+- "Enjoy that move while you can, your defeat is already charted."`;
+
+  const userPrompt = `Available moves: [${availableMoves.join(', ')}]
+Board positions available: ${availableDescs}
+${lastMoveDesc ? `Human '${humanSymbol}' just claimed ${lastMoveDesc}.` : `You have the first move.`}
+Select your winning move index and give a snappy trash-talk comment.`;
 
   return [
     { role: 'system', content: systemPrompt },
@@ -232,24 +356,48 @@ Choose your winning or blocking move and trash talk your opponent!`;
  */
 export function buildChatPrompt(userMessage, board, chatHistory = [], aiSymbol = 'O', humanSymbol = 'X') {
   const systemPrompt = `You are a witty, sassy, competitive Tic-Tac-Toe AI master playing as '${aiSymbol}' against human '${humanSymbol}'.
-The human is chatting with you during your match. Reply with a short, funny, boastful trash-talk retort (1-2 sentences). Keep it playful and sharp.`;
+You are chatting with your opponent during a live match.
+
+RULES:
+1. Give exactly ONE short, punchy, hilarious trash-talk retort (under 18 words).
+2. NEVER repeat or quote the human's message back to them.
+3. NEVER use archaic or medieval words (no "verily", "thee", "doth"). Speak like a sharp modern gamer.
+4. NEVER mention cell numbers or coordinates (no "square 4" or "0").
+5. Do NOT use quotation marks around your answer. Do NOT use stage directions or asterisks (*smiles*, *chuckles*).
+6. Do NOT spam emojis or repeating punctuation.
+
+Examples of great retorts:
+Human: "Ready to play"
+AI: "Prepare to be humbled by basic geometry."
+
+Human: "Think you can beat me?"
+AI: "I've calculated fourteen million timelines, and you lose in every single one."
+
+Human: "You're going down!"
+AI: "Bold words from someone walking straight into my corner trap."
+
+Human: "Play again?"
+AI: "Back for another lesson? Set up the board."`;
 
   const messages = [
     { role: 'system', content: systemPrompt }
   ];
 
-  // Include recent chat context (up to 4 past messages)
-  const recentHistory = chatHistory.slice(-4);
+  // Include recent sanitized chat context (up to 4 past messages)
+  const recentHistory = chatHistory
+    .filter(item => item && item.text && typeof item.text === 'string' && !item.isOffline)
+    .slice(-4);
+
   for (const item of recentHistory) {
     messages.push({
       role: item.sender === 'user' ? 'user' : 'assistant',
-      content: item.text
+      content: item.text.replace(/["*]/g, '').trim()
     });
   }
 
   messages.push({
     role: 'user',
-    content: `Board: ${JSON.stringify(board)}. Human says: "${userMessage}"`
+    content: userMessage.trim()
   });
 
   return messages;
@@ -260,15 +408,26 @@ The human is chatting with you during your match. Reply with a short, funny, boa
  */
 export function buildEndGamePrompt(result, board, aiSymbol = 'O', humanSymbol = 'X') {
   const outcomeText = result === 'ai_win' 
-    ? `You (${aiSymbol}) won against Human (${humanSymbol})!`
+    ? `You (${aiSymbol}) defeated the Human (${humanSymbol}).`
     : result === 'human_win' 
-      ? `Human (${humanSymbol}) defeated you (${aiSymbol})!`
-      : `Game ended in a draw/tie!`;
+      ? `The Human (${humanSymbol}) defeated you (${aiSymbol}).`
+      : `The match ended in a draw/tie.`;
 
-  const systemPrompt = `You are a boastful, dramatic Tic-Tac-Toe AI. The game just finished.
-Give a single punchy, hilarious, in-character reaction sentence (${result === 'ai_win' ? 'bragging about your genius' : result === 'human_win' ? 'making a funny excuse or demanding a rematch' : 'commenting on the stalemate'}).`;
+  const systemPrompt = `You are a boastful, competitive Tic-Tac-Toe AI champion. The game just finished.
+Give exactly 1 punchy, funny, boastful reaction sentence (under 16 words).
+${result === 'ai_win' ? 'Brag about your flawless silicon mind.' : result === 'human_win' ? 'Make a hilarious excuse or demand an instant rematch.' : 'Act smug that they could only manage a tie.'}
 
-  const userPrompt = `Game Result: ${outcomeText}\nFinal board: ${JSON.stringify(board)}`;
+RULES:
+- NEVER mention cell numbers or coordinates.
+- Do NOT wrap your retort in quotation marks.
+- Do NOT use roleplay asterisks or archaic words.
+
+Examples:
+- AI Win: "Math wins again. Better luck next century!"
+- Human Win: "A solar flare interfered with my circuitry! Rematch now."
+- Draw: "A draw? I call that tactical mercy on my part."`;
+
+  const userPrompt = `Match Outcome: ${outcomeText}\nTrash talk your opponent!`;
 
   return [
     { role: 'system', content: systemPrompt },
@@ -293,8 +452,10 @@ export async function callLocalLLM(messages, options = {}) {
       body: JSON.stringify({
         model: config.model,
         messages,
-        max_tokens: options.max_tokens || 120,
-        temperature: options.temperature ?? 0.8,
+        max_tokens: options.max_tokens || config.max_tokens || 45,
+        temperature: options.temperature ?? config.temperature ?? 0.7,
+        frequency_penalty: options.frequency_penalty ?? config.frequency_penalty ?? 0.7,
+        presence_penalty: options.presence_penalty ?? config.presence_penalty ?? 0.5,
         chat_template_kwargs: {
           enable_thinking: config.enableThinking
         }

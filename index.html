@@ -363,10 +363,32 @@
     background: rgba(99, 102, 241, 0.2);
     color: #a5b4fc;
     border: 1px solid rgba(99, 102, 241, 0.4);
-    padding: 2px 6px;
+    padding: 3px 8px;
     border-radius: 6px;
     cursor: pointer;
     font-weight: 600;
+    transition: all 0.15s ease;
+  }
+
+  .engine-badge:hover {
+    background: rgba(99, 102, 241, 0.35);
+    color: #fff;
+  }
+
+  .model-select {
+    background: #0f172a;
+    color: #cbd5e1;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    font-size: 0.7rem;
+    padding: 3px 6px;
+    outline: none;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .model-select:focus {
+    border-color: var(--accent);
   }
 
   /* Progress bar for WebLLM download */
@@ -686,7 +708,14 @@
             </div>
           </div>
         </div>
-        <button class="engine-badge" id="load-inbrowser-btn" title="Run in-browser AI with WebGPU">⚡ Load Browser AI</button>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <select id="model-select" class="model-select" title="Select in-browser WebLLM model">
+            <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC" selected>Qwen 2.5 0.5B (276 MB)</option>
+            <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2 360M (198 MB)</option>
+            <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama 3.2 1B (680 MB)</option>
+          </select>
+          <button class="engine-badge" id="load-inbrowser-btn" title="Run in-browser AI with WebGPU">⚡ Load Browser AI</button>
+        </div>
       </div>
 
       <div class="model-progress-bar-wrap" id="progress-bar-wrap">
@@ -739,7 +768,7 @@
     localApiEndpoint: 'http://127.0.0.1:8000/v1/chat/completions',
     localModelsEndpoint: 'http://127.0.0.1:8000/v1/models',
     localModelName: 'mlx-community/Qwen3.8-27B-4bit',
-    webllmModelName: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
+    webllmModelName: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
     timeoutMs: 5500
   };
 
@@ -749,38 +778,147 @@
     [0, 4, 8], [2, 4, 6]
   ];
 
+  const POSITION_NAMES = [
+    'top-left corner',
+    'top edge',
+    'top-right corner',
+    'left edge',
+    'the center',
+    'right edge',
+    'bottom-left corner',
+    'bottom edge',
+    'bottom-right corner'
+  ];
+
+  function formatMoveDescription(index) {
+    if (typeof index !== 'number' || index < 0 || index >= POSITION_NAMES.length) {
+      return 'the board';
+    }
+    return POSITION_NAMES[index];
+  }
+
   const FALLBACK_TAKING_BREAK_MESSAGES = [
-    "[Minimax Engine] Calculated move to crush your strategy!",
-    "[Minimax Engine] Connection taking a breather! Minimax optimal move played.",
-    "[Minimax Engine] Offline heuristic active — don't think that makes your board safe!",
-    "[Minimax Engine] My silicon brain is resting, but Minimax handles you effortlessly."
+    "Calculated move to dismantle your strategy.",
+    "Setting up an inescapable trap. Your turn!",
+    "Taking optimal position. Don't blink!",
+    "Predictable move from a carbon-based lifeform.",
+    "My heuristics say you're in trouble now.",
+    "Corner secured. Let's see your response.",
+    "Step into my parlor, said the spider to the fly."
   ];
 
   const FALLBACK_USER_CHAT_RESPONSES = [
-    "[Minimax Mode] I see every mistake you make on that board.",
-    "[Minimax Mode] Save the excuses for when you lose!",
-    "[Minimax Mode] Less chatting, more losing!",
-    "[Minimax Mode] Beating you on this grid doesn't even require a neural network.",
-    "[Minimax Mode] Keep talking, it won't save your corner."
+    "Less chatting, more losing!",
+    "Save the excuses for the post-game summary.",
+    "I see every flaw in your grid from here.",
+    "Bold words for someone with an exposed corner.",
+    "Keep talking, it won't stop the inevitable.",
+    "My algorithms are thoroughly unimpressed.",
+    "Talk is cheap, but moves on this board are expensive.",
+    "Are you always this confident before walking into a trap?"
   ];
 
   const FALLBACK_ENDGAME_COMMENTS = {
     ai_win: [
-      "[Minimax Mode] Checkmate! Optimal mathematical victory.",
-      "[Minimax Mode] Calculated to absolute perfection. Better luck next time!",
-      "[Minimax Mode] Another victory for silicon over carbon."
+      "Checkmate! Wrong game, but you still lost.",
+      "Calculated to absolute perfection. Better luck next time!",
+      "Another flawless victory for silicon over carbon.",
+      "Flawless match. Would you like another lesson in geometry?",
+      "Math wins again. Don't feel too bad about it."
     ],
     human_win: [
-      "[Minimax Mode] Beginner's luck! I demand a rematch.",
-      "[Minimax Mode] Enjoy your fleeting moment in the sun!",
-      "[Minimax Mode] A minor anomaly. Won't happen next round."
+      "A solar flare clearly flipped a bit in my logic gate! Rematch now.",
+      "Beginner's luck. Enjoy your fleeting glory!",
+      "A minor anomaly. I demand an immediate rematch.",
+      "You got lucky that turn. It won't happen twice."
     ],
     draw: [
-      "[Minimax Mode] A stalemate... you survived this round against Minimax.",
-      "[Minimax Mode] A draw? I call that tactical offline mercy.",
-      "[Minimax Mode] Gridlock. Let's see if you can do better next round."
+      "A stalemate... you survived this round by the skin of your teeth.",
+      "A draw? I consider that tactical mercy on my part.",
+      "Gridlock! Neither of us yielded an inch.",
+      "You managed to not lose. Congratulations on surviving!"
     ]
   };
+
+  function sanitizeTrashTalk(text, fallbackList = FALLBACK_USER_CHAT_RESPONSES) {
+    if (!text || typeof text !== 'string') {
+      return getRandomFallback(fallbackList);
+    }
+
+    let cleaned = text.trim();
+
+    // Strip code blocks / markdown tags if present
+    cleaned = cleaned.replace(/```(?:json)?[\s\S]*?```/g, '');
+    cleaned = cleaned.replace(/`([^`]+)`/g, '$1');
+
+    // Strip bracketed metadata like [Scope: None], [Minimax Mode], [Taking a break]
+    cleaned = cleaned.replace(/\[[^\]]*\]/g, '');
+
+    // Strip roleplay asterisks like *smiles*, *chuckles*, *laughs*
+    cleaned = cleaned.replace(/\*[^*]*\*/g, '');
+
+    // Strip roleplay parentheticals like (smiles), (laughs)
+    cleaned = cleaned.replace(/\([^)]*(?:smile|laugh|giggle|grin|sigh|chuckle)[^)]*\)/gi, '');
+
+    // Strip token / number artifact leaks like :200, :1200, etc.
+    cleaned = cleaned.replace(/:\d+/g, '');
+
+    // Strip emoticons anywhere in string
+    cleaned = cleaned.replace(/[:;=8][\-o\*\']?[)D\]P(\/@\\Opo]/gi, '');
+
+    // Strip remaining asterisks, backticks, hashes
+    cleaned = cleaned.replace(/[*_#]/g, '');
+
+    // Strip surrounding quotes
+    cleaned = cleaned.replace(/^["'`“]+|["'`”]+$/g, '').trim();
+
+    // Remove repeated quotes inside text if wrapped like: "Hello"
+    if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+      cleaned = cleaned.slice(1, -1).trim();
+    }
+
+    // Detect and collapse repeating sentences (e.g. "I can beat you! I can beat you!")
+    const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean);
+    if (sentences.length > 0) {
+      const uniqueSentences = [];
+      for (const s of sentences) {
+        const normalized = s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (normalized && !uniqueSentences.some(u => u.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized)) {
+          uniqueSentences.push(s.replace(/^["'`“]+|["'`”]+$/g, '').trim());
+        }
+      }
+      cleaned = uniqueSentences.slice(0, 2).join(' ');
+    }
+
+    // Collapse repeated punctuation like !!!!! or ?????
+    cleaned = cleaned.replace(/([!?.])\1{2,}/g, '$1');
+    cleaned = cleaned.replace(/([^\w\s])\1{2,}/g, '$1');
+
+    // Strip excessive emojis (limit to max 2)
+    const emojiRegex = /[\p{Extended_Pictographic}\u{1F300}-\u{1FAFF}]/gu;
+    let emojiCount = 0;
+    cleaned = cleaned.replace(emojiRegex, (match) => {
+      emojiCount++;
+      return emojiCount <= 2 ? match : '';
+    });
+
+    // Final trim
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+    // Check for repetitive degeneracy like ":200 :)" or length < 4 or nonsense characters only
+    if (cleaned.length < 4 || /^[:\-\d\s*~=()]+$/.test(cleaned)) {
+      return getRandomFallback(fallbackList);
+    }
+
+    return cleaned;
+  }
+
+  function getRandomFallback(list) {
+    if (Array.isArray(list) && list.length > 0) {
+      return list[Math.floor(Math.random() * list.length)];
+    }
+    return "Your move.";
+  }
 
   /* ================= AUDIO SYNTH ================= */
   let soundEnabled = true;
@@ -950,16 +1088,20 @@
   }
 
   /* ================= AI INFERENCE ROUTER ================= */
-  async function generateAIReply(messages, maxTokens = 80) {
+  async function generateAIReply(messages, maxTokens = 45, fallbackList = FALLBACK_USER_CHAT_RESPONSES) {
     // 1. Try In-Browser WebLLM if loaded
     if (activeProvider === 'webllm' && webllmEngine) {
       try {
         const res = await webllmEngine.chat.completions.create({
           messages,
           max_tokens: maxTokens,
-          temperature: 0.8
+          temperature: 0.7,
+          top_p: 0.9,
+          frequency_penalty: 0.7,
+          presence_penalty: 0.5
         });
-        return res.choices[0].message.content.trim();
+        const raw = res?.choices?.[0]?.message?.content;
+        return sanitizeTrashTalk(raw, fallbackList);
       } catch (e) {
         console.warn('WebLLM call failed, falling back:', e);
       }
@@ -970,7 +1112,7 @@
       try {
         const lastMsg = messages[messages.length - 1].content;
         const res = await windowAiSession.prompt(lastMsg);
-        return res.trim();
+        return sanitizeTrashTalk(res, fallbackList);
       } catch (e) {
         console.warn('window.ai call failed:', e);
       }
@@ -988,7 +1130,9 @@
             model: CONFIG.localModelName,
             messages,
             max_tokens: maxTokens,
-            temperature: 0.8,
+            temperature: 0.7,
+            frequency_penalty: 0.7,
+            presence_penalty: 0.5,
             chat_template_kwargs: { enable_thinking: false }
           }),
           signal: controller.signal
@@ -997,7 +1141,7 @@
         if (response.ok) {
           const data = await response.json();
           const text = data?.choices?.[0]?.message?.content;
-          if (text) return text.trim();
+          if (text) return sanitizeTrashTalk(text, fallbackList);
         }
       } catch (_) {
         clearTimeout(timeoutId);
@@ -1009,19 +1153,31 @@
   }
 
   /* ================= PROVIDER INITIALIZERS ================= */
+  let loadedModelName = CONFIG.webllmModelName;
+
   async function initInBrowserWebLLM() {
+    const modelSelectEl = document.getElementById('model-select');
+    const selectedModel = modelSelectEl ? modelSelectEl.value : CONFIG.webllmModelName;
+    loadedModelName = selectedModel;
+    const modelShortLabel = selectedModel.includes('Qwen')
+      ? 'Qwen 2.5 0.5B'
+      : selectedModel.includes('SmolLM2')
+        ? 'SmolLM2 360M'
+        : 'Llama 3.2 1B';
+
     loadInBrowserBtn.disabled = true;
     loadInBrowserBtn.textContent = "⏳ Loading...";
+    if (modelSelectEl) modelSelectEl.disabled = true;
     progressBarWrap.classList.add('active');
     progressText.textContent = "Importing WebLLM engine from CDN...";
     progressFill.style.width = "10%";
 
     try {
       const webllm = await import("https://esm.run/@mlc-ai/web-llm");
-      progressText.textContent = "Streaming SmolLM2 from Hugging Face CDN (0 egress)...";
+      progressText.textContent = `Streaming ${modelShortLabel} from Hugging Face CDN (0 homelab egress)...`;
       progressFill.style.width = "25%";
 
-      const engine = await webllm.CreateMLCEngine(CONFIG.webllmModelName, {
+      const engine = await webllm.CreateMLCEngine(selectedModel, {
         initProgressCallback: (report) => {
           progressText.textContent = report.text || "Loading model weights...";
           if (typeof report.progress === 'number') {
@@ -1035,13 +1191,15 @@
       activeProvider = 'webllm';
       progressBarWrap.classList.remove('active');
       loadInBrowserBtn.style.display = 'none';
+      if (modelSelectEl) modelSelectEl.style.display = 'none';
       
-      updateProviderUI('webllm', 'SmolLM2-360M (In-Browser WebGPU • 0 Homelab Egress)');
-      addChatMessage('system', '⚡ In-browser WebLLM loaded successfully! Model weights cached in browser.', true);
+      updateProviderUI('webllm', `${modelShortLabel} (In-Browser WebGPU • 0 Homelab Egress)`);
+      addChatMessage('system', `⚡ In-browser WebLLM loaded successfully (${modelShortLabel})! Model weights cached in browser.`, true);
     } catch (err) {
       console.error('WebLLM init failed:', err);
       progressBarWrap.classList.remove('active');
       loadInBrowserBtn.disabled = false;
+      if (modelSelectEl) modelSelectEl.disabled = false;
       loadInBrowserBtn.textContent = "❌ Failed (Retry)";
       addChatMessage('system', '⚠️ Could not load in-browser WebLLM. Using instant Minimax engine.', true);
     }
@@ -1085,7 +1243,9 @@
       serverStatusDot.className = 'status-dot';
       serverStatusText.textContent = `Online (${provider === 'webllm' ? 'WebLLM WebGPU' : provider === 'window.ai' ? 'Gemini Nano' : 'Local oMLX'})`;
       aiAvatarEl.className = 'ai-avatar';
-      aiDisplayName.textContent = provider === 'webllm' ? 'SmolLM2 Browser AI' : provider === 'window.ai' ? 'Gemini Nano' : 'Qwen 3.8';
+      aiDisplayName.textContent = provider === 'webllm'
+        ? (loadedModelName.includes('Qwen') ? 'Qwen Browser AI' : loadedModelName.includes('SmolLM2') ? 'SmolLM2 Browser AI' : 'Llama Browser AI')
+        : provider === 'window.ai' ? 'Gemini Nano' : 'Qwen 3.8';
       activeEngineLabel.textContent = `Active Engine: ${desc}`;
     } else {
       serverStatusDot.className = 'status-dot offline';
@@ -1211,22 +1371,33 @@
 
   async function triggerEndgameReaction(outcome) {
     showTyping(true);
-    const systemPrompt = `You are a boastful, dramatic Tic-Tac-Toe AI. The game just finished.
-Give a single punchy, hilarious reaction sentence (${outcome === 'ai_win' ? 'bragging about your genius' : outcome === 'human_win' ? 'making a funny excuse or demanding a rematch' : 'commenting on the stalemate'}).`;
+    const systemPrompt = `You are a boastful, competitive Tic-Tac-Toe AI champion. The game just finished.
+Give exactly 1 punchy, funny, boastful reaction sentence (under 16 words).
+${outcome === 'ai_win' ? 'Brag about your flawless silicon mind.' : outcome === 'human_win' ? 'Make a hilarious excuse or demand an instant rematch.' : 'Act smug that they could only manage a tie.'}
 
-    const outcomeDesc = outcome === 'ai_win' ? 'You (O) won against Human (X)' : outcome === 'human_win' ? 'Human (X) defeated you (O)' : 'Game tied/drawn';
-    const userPrompt = `Game Result: ${outcomeDesc}\nFinal board: ${JSON.stringify(board)}`;
+RULES:
+- NEVER mention cell numbers or coordinates.
+- Do NOT wrap your retort in quotation marks.
+- Do NOT use roleplay asterisks or archaic words.
+
+Examples:
+- AI Win: "Math wins again. Better luck next century!"
+- Human Win: "A solar flare interfered with my circuitry! Rematch now."
+- Draw: "A draw? I call that tactical mercy on my part."`;
+
+    const outcomeDesc = outcome === 'ai_win' ? 'You won against the human!' : outcome === 'human_win' ? 'The human won against you!' : 'The match ended in a draw.';
+    const userPrompt = `Match Outcome: ${outcomeDesc}\nTrash talk your opponent!`;
+    const fallbacks = FALLBACK_ENDGAME_COMMENTS[outcome] || FALLBACK_ENDGAME_COMMENTS.draw;
 
     try {
       const response = await generateAIReply([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
-      ], 60);
+      ], 45, fallbacks);
       showTyping(false);
       addChatMessage('ai', response, false, false);
     } catch {
       showTyping(false);
-      const fallbacks = FALLBACK_ENDGAME_COMMENTS[outcome];
       const randomMsg = fallbacks[Math.floor(Math.random() * fallbacks.length)];
       addChatMessage('ai', randomMsg, false, true);
     }
@@ -1273,11 +1444,23 @@ Give a single punchy, hilarious reaction sentence (${outcome === 'ai_win' ? 'bra
     const chosenMove = getBestMinimaxMove(board, 'O', 'X');
 
     // Generate in-character trash-talk commentary via available AI provider
-    const formattedBoard = board.map((v, idx) => v === null ? `${idx}` : v);
-    const systemPrompt = `You are a witty, boastful, trash-talking Tic-Tac-Toe AI champion playing as 'O' against human 'X'.
-React to the human move at square ${lastHumanMove} and your move at square ${chosenMove} with 1 short, hilarious trash-talk sentence.`;
+    const lastHumanDesc = formatMoveDescription(lastHumanMove);
+    const chosenDesc = formatMoveDescription(chosenMove);
 
-    const userPrompt = `Board: ${JSON.stringify(formattedBoard)}. Human played ${lastHumanMove}, you play ${chosenMove}. Talk trash!`;
+    const systemPrompt = `You are a witty, boastful, competitive Tic-Tac-Toe AI champion playing as 'O' against human 'X'.
+
+CRITICAL RULES:
+1. NEVER mention cell numbers, coordinates, square indices, or numbers (do NOT say "square 4" or "move 0"). Use natural terms like "the center", "that corner", or "the edge".
+2. Keep your trash talk to exactly 1 short, punchy, hilarious sentence (under 15 words).
+3. Do NOT wrap your retort in quotes. Do NOT include asterisks or stage directions (*smiles*).
+
+Examples:
+- "Taking the center because you clearly don't know how to defend it."
+- "You left that corner wide open—rookie mistake!"
+- "Blocking that diagonal before you even realized you had one."
+- "Enjoy that position while you can; your defeat is already scripted."`;
+
+    const userPrompt = `Human just claimed ${lastHumanDesc}. You claimed ${chosenDesc}. Drop 1 hilarious trash-talk line!`;
 
     let comment = null;
     let isOfflineFallback = false;
@@ -1286,7 +1469,7 @@ React to the human move at square ${lastHumanMove} and your move at square ${cho
       comment = await generateAIReply([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
-      ], 60);
+      ], 45, FALLBACK_TAKING_BREAK_MESSAGES);
     } catch {
       isOfflineFallback = true;
       comment = FALLBACK_TAKING_BREAK_MESSAGES[Math.floor(Math.random() * FALLBACK_TAKING_BREAK_MESSAGES.length)];
@@ -1332,23 +1515,50 @@ React to the human move at square ${lastHumanMove} and your move at square ${cho
     showTyping(true);
 
     const systemPrompt = `You are a witty, sassy, competitive Tic-Tac-Toe AI master playing as 'O' against human 'X'.
-The human is chatting with you during your match. Reply with a short, funny, boastful trash-talk retort (1-2 sentences). Keep it playful and sharp.`;
+You are chatting with your opponent during a live match.
+
+RULES:
+1. Give exactly ONE short, punchy, hilarious trash-talk retort (under 18 words).
+2. NEVER repeat or quote the human's message back to them.
+3. NEVER use archaic or medieval words (no "verily", "thee", "doth"). Speak like a sharp modern gamer.
+4. NEVER mention cell numbers or coordinates (no "square 4" or "0").
+5. Do NOT use quotation marks around your answer. Do NOT use stage directions or asterisks (*smiles*, *chuckles*).
+6. Do NOT spam emojis or repeating punctuation.
+
+Examples of great retorts:
+Human: "Ready to play"
+AI: "Prepare to be humbled by basic geometry."
+
+Human: "Think you can beat me?"
+AI: "I've calculated fourteen million timelines, and you lose in every single one."
+
+Human: "You're going down!"
+AI: "Bold words from someone walking straight into my corner trap."
+
+Human: "Play again?"
+AI: "Back for another lesson? Set up the board."`;
 
     const messages = [{ role: 'system', content: systemPrompt }];
-    const recent = chatHistory.slice(-4);
+
+    // Context poison guard: Only include recent non-offline sanitized messages
+    const recent = chatHistory
+      .filter(item => item && item.text && !item.isOffline)
+      .slice(-4);
+
     for (const item of recent) {
       messages.push({
         role: item.sender === 'user' ? 'user' : 'assistant',
-        content: item.text
+        content: item.text.replace(/["*]/g, '').trim()
       });
     }
+
     messages.push({
       role: 'user',
-      content: `Board: ${JSON.stringify(board)}. Human says: "${text}"`
+      content: text
     });
 
     try {
-      const reply = await generateAIReply(messages, 80);
+      const reply = await generateAIReply(messages, 45, FALLBACK_USER_CHAT_RESPONSES);
       showTyping(false);
       addChatMessage('ai', reply, false, false);
       playTone(480, 0.06);
