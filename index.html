@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe - AI Trash Talk Edition</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-border: #334155;
+    --cell: #1e293b;
+    --cell-hover: #334155;
+    --cell-active: #475569;
+    --x: #38bdf8;
+    --x-glow: rgba(56, 189, 248, 0.35);
+    --o: #fb7185;
+    --o-glow: rgba(251, 113, 133, 0.35);
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --win: #4ade80;
+    --win-glow: rgba(74, 222, 128, 0.4);
+    --accent: #818cf8;
+    --online: #22c55e;
+    --offline: #f59e0b;
+    --offline-badge: #e11d48;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(circle at 50% 10%, #1e1b4b 0%, var(--bg) 60%);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: 2.2rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 800;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  h1 .x { color: var(--x); text-shadow: 0 0 16px var(--x-glow); }
+  h1 .t { color: var(--muted); }
+  h1 .o { color: var(--o); text-shadow: 0 0 16px var(--o-glow); }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+  }
+
+  /* Mode Switcher */
+  .mode-selector {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    padding: 4px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
+
+  .mode-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mode-btn.active {
+    background: var(--accent);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(129, 140, 248, 0.4);
+  }
+
+  /* Main Game Container */
+  .game-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    width: 100%;
+    max-width: 960px;
+  }
+
+  @media (min-width: 768px) {
+    .game-layout {
+      grid-template-columns: 340px 1fr;
+      align-items: start;
+    }
+  }
+
+  /* Left Panel: Board & Controls */
+  .board-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    background: rgba(30, 41, 59, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--panel-border);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  }
+
+  #status {
+    font-size: 1.1rem;
+    min-height: 1.6em;
+    color: var(--muted);
+    text-align: center;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  #status .turn-x { color: var(--x); font-weight: 700; }
+  #status .turn-o { color: var(--o); font-weight: 700; }
+  #status .winner { color: var(--win); font-weight: 800; text-shadow: 0 0 12px var(--win-glow); }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    background: #090d16;
+    padding: 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+  }
+
+  .cell {
+    width: 88px;
+    height: 88px;
+    background: var(--cell);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    font-size: 2.8rem;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease-out;
+    color: var(--text);
+    user-select: none;
+  }
+
+  .cell:hover:not(:disabled) {
+    background: var(--cell-hover);
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  .cell:active:not(:disabled) {
+    background: var(--cell-active);
+    transform: scale(0.96);
+  }
+
+  .cell:disabled {
+    cursor: default;
+    opacity: 0.95;
+  }
+
+  .cell.x {
+    color: var(--x);
+    text-shadow: 0 0 12px var(--x-glow);
+  }
+
+  .cell.o {
+    color: var(--o);
+    text-shadow: 0 0 12px var(--o-glow);
+  }
+
+  .cell.win {
+    background: rgba(74, 222, 128, 0.2) !important;
+    border-color: var(--win) !important;
+    animation: win-pulse 0.7s ease-in-out infinite alternate;
+  }
+
+  @keyframes win-pulse {
+    from { box-shadow: 0 0 6px var(--win-glow); transform: scale(1); }
+    to   { box-shadow: 0 0 20px 4px var(--win-glow); transform: scale(1.03); }
+  }
+
+  .cell.pop { animation: pop 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+  @keyframes pop {
+    0% { transform: scale(0.3); opacity: 0; }
+    80% { transform: scale(1.12); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+
+  /* Scoreboard */
+  #scores {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .score {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 8px 10px;
+    text-align: center;
+  }
+
+  .score .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .score .value {
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin-top: 2px;
+  }
+
+  .score.x .value { color: var(--x); }
+  .score.o .value { color: var(--o); }
+  .score.draw .value { color: var(--muted); }
+
+  /* Control buttons */
+  #controls {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+  }
+
+  button.action {
+    flex: 1;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  button.action:hover {
+    background: var(--cell-hover);
+    border-color: var(--accent);
+  }
+
+  button.action:active {
+    transform: scale(0.98);
+  }
+
+  /* Right Panel: AI Chat & Trash Talk */
+  .chat-section {
+    background: rgba(30, 41, 59, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--panel-border);
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    height: 500px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  }
+
+  .chat-header {
+    background: var(--panel);
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .ai-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ai-avatar {
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  }
+
+  .ai-avatar.offline {
+    background: linear-gradient(135deg, #64748b, #475569);
+    box-shadow: none;
+  }
+
+  .ai-meta .ai-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .ai-meta .ai-status-indicator {
+    font-size: 0.75rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--online);
+    box-shadow: 0 0 8px var(--online);
+    transition: all 0.3s ease;
+  }
+
+  .status-dot.offline {
+    background: var(--offline);
+    box-shadow: 0 0 8px var(--offline);
+  }
+
+  .engine-badge {
+    font-size: 0.65rem;
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    padding: 2px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  /* Progress bar for WebLLM download */
+  .model-progress-bar-wrap {
+    display: none;
+    background: #0f172a;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--panel-border);
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .model-progress-bar-wrap.active {
+    display: block;
+  }
+
+  .model-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #334155;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .model-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #6366f1, #38bdf8);
+    transition: width 0.2s ease;
+  }
+
+  .chat-messages {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-behavior: smooth;
+  }
+
+  .chat-message {
+    display: flex;
+    flex-direction: column;
+    max-width: 88%;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .chat-message.ai {
+    align-self: flex-start;
+  }
+
+  .chat-message.user {
+    align-self: flex-end;
+  }
+
+  .chat-message.system {
+    align-self: center;
+    max-width: 95%;
+  }
+
+  .message-sender {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 4px;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .offline-tag {
+    font-size: 0.65rem;
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .message-bubble {
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+
+  .chat-message.ai .message-bubble {
+    background: #334155;
+    color: #f8fafc;
+    border-bottom-left-radius: 4px;
+    border-left: 3px solid var(--o);
+  }
+
+  .chat-message.ai.is-offline .message-bubble {
+    border-left-color: var(--offline);
+    background: #293548;
+  }
+
+  .chat-message.user .message-bubble {
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+  }
+
+  .chat-message.system .message-bubble {
+    background: rgba(51, 65, 85, 0.45);
+    border: 1px dashed #475569;
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    text-align: center;
+    border-radius: 8px;
+    padding: 6px 12px;
+  }
+
+  /* Typing indicator */
+  .typing-indicator {
+    display: none;
+    align-self: flex-start;
+    background: #334155;
+    padding: 10px 16px;
+    border-radius: 14px;
+    border-bottom-left-radius: 4px;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .typing-indicator.active {
+    display: flex;
+  }
+
+  .typing-indicator span {
+    width: 6px;
+    height: 6px;
+    background: var(--muted);
+    border-radius: 50%;
+    animation: bounce 1.2s infinite ease-in-out;
+  }
+
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-5px); background: var(--text); }
+  }
+
+  /* Quick Trash-talk Chips */
+  .chat-chips {
+    display: flex;
+    gap: 6px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    background: rgba(15, 23, 42, 0.4);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    scrollbar-width: none;
+  }
+  .chat-chips::-webkit-scrollbar { display: none; }
+
+  .chip-btn {
+    background: #334155;
+    color: #cbd5e1;
+    border: 1px solid #475569;
+    border-radius: 14px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .chip-btn:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  /* Chat Input */
+  .chat-input-row {
+    padding: 12px;
+    background: var(--panel);
+    border-top: 1px solid var(--panel-border);
+    display: flex;
+    gap: 8px;
+  }
+
+  .chat-input {
+    flex: 1;
+    background: #0f172a;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .chat-input:focus {
+    border-color: var(--accent);
+  }
+
+  .send-btn {
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    padding: 0 16px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .send-btn:hover {
+    background: #6366f1;
+  }
+
+  .send-btn:active {
+    transform: scale(0.96);
+  }
+
+  /* Settings bar */
+  .settings-bar {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .settings-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  .settings-btn:hover {
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+
+  <header>
+    <h1><span class="x">Tic</span> <span class="t">Tac</span> <span class="o">Toe</span></h1>
+    <div class="subtitle">AI Trash-Talk Edition &bull; In-Browser WebLLM / Local AI + Minimax Engine</div>
+  </header>
+
+  <!-- Mode Selector -->
+  <div class="mode-selector" role="radiogroup" aria-label="Game Mode">
+    <button class="mode-btn active" id="mode-ai" role="radio" aria-checked="true">
+      🤖 Play vs AI
+    </button>
+    <button class="mode-btn" id="mode-2p" role="radio" aria-checked="false">
+      👥 2-Player Local
+    </button>
+  </div>
+
+  <div class="game-layout">
+    <!-- Left: Board & Score -->
+    <div class="board-section">
+      <div id="status" aria-live="polite"></div>
+
+      <div id="board" aria-label="Tic tac toe board"></div>
+
+      <div id="scores">
+        <div class="score x">
+          <div class="label" id="label-x">Player (X)</div>
+          <div class="value" id="score-x">0</div>
+        </div>
+        <div class="score draw">
+          <div class="label">Draws</div>
+          <div class="value" id="score-draw">0</div>
+        </div>
+        <div class="score o">
+          <div class="label" id="label-o">AI (O)</div>
+          <div class="value" id="score-o">0</div>
+        </div>
+      </div>
+
+      <div id="controls">
+        <button class="action" id="new-round">🔄 New Round</button>
+        <button class="action" id="reset-all">🗑️ Reset Scores</button>
+      </div>
+    </div>
+
+    <!-- Right: In-game AI Chat Panel -->
+    <div class="chat-section" id="chat-section">
+      <div class="chat-header">
+        <div class="ai-profile">
+          <div class="ai-avatar" id="ai-avatar-el">🤖</div>
+          <div class="ai-meta">
+            <div class="ai-name" id="ai-display-name">AI Trash-Talker</div>
+            <div class="ai-status-indicator">
+              <span class="status-dot offline" id="server-status-dot"></span>
+              <span id="server-status-text">Detecting AI provider...</span>
+            </div>
+          </div>
+        </div>
+        <button class="engine-badge" id="load-inbrowser-btn" title="Run in-browser AI with WebGPU">⚡ Load Browser AI</button>
+      </div>
+
+      <div class="model-progress-bar-wrap" id="progress-bar-wrap">
+        <div id="progress-text">Streaming model from Hugging Face CDN (0 egress)...</div>
+        <div class="model-progress-bar">
+          <div class="model-progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chat-messages">
+        <!-- Messages rendered dynamically -->
+      </div>
+
+      <div class="typing-indicator" id="typing-indicator">
+        <span></span><span></span><span></span>
+      </div>
+
+      <!-- Quick Trash-Talk Suggestions -->
+      <div class="chat-chips">
+        <button class="chip-btn" data-text="You're going down!">🔥 You're going down!</button>
+        <button class="chip-btn" data-text="Think you can beat me?">😏 Think you can beat me?</button>
+        <button class="chip-btn" data-text="Nice move... not!">💀 Nice move... not!</button>
+        <button class="chip-btn" data-text="GG in advance">🏆 GG in advance</button>
+      </div>
+
+      <form class="chat-input-row" id="chat-form">
+        <input 
+          type="text" 
+          id="chat-input" 
+          class="chat-input" 
+          placeholder="Talk trash to the AI..." 
+          autocomplete="off"
+          maxlength="150"
+        />
+        <button type="submit" class="send-btn" id="chat-send-btn">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="settings-bar">
+    <span id="active-engine-label">Engine: Minimax + Canned Trash Talk (0 KB Egress)</span>
+    &bull;
+    <button class="settings-btn" id="toggle-sound">🔊 Sound: ON</button>
+  </div>
+
+<script>
+(() => {
+  /* ================= CONFIGURATION & CONSTANTS ================= */
+  const CONFIG = {
+    localApiEndpoint: 'http://127.0.0.1:8000/v1/chat/completions',
+    localModelsEndpoint: 'http://127.0.0.1:8000/v1/models',
+    localModelName: 'mlx-community/Qwen3.8-27B-4bit',
+    webllmModelName: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
+    timeoutMs: 5500
+  };
+
+  const WINNING_LINES = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+  ];
+
+  const FALLBACK_TAKING_BREAK_MESSAGES = [
+    "[Minimax Engine] Calculated move to crush your strategy!",
+    "[Minimax Engine] Connection taking a breather! Minimax optimal move played.",
+    "[Minimax Engine] Offline heuristic active — don't think that makes your board safe!",
+    "[Minimax Engine] My silicon brain is resting, but Minimax handles you effortlessly."
+  ];
+
+  const FALLBACK_USER_CHAT_RESPONSES = [
+    "[Minimax Mode] I see every mistake you make on that board.",
+    "[Minimax Mode] Save the excuses for when you lose!",
+    "[Minimax Mode] Less chatting, more losing!",
+    "[Minimax Mode] Beating you on this grid doesn't even require a neural network.",
+    "[Minimax Mode] Keep talking, it won't save your corner."
+  ];
+
+  const FALLBACK_ENDGAME_COMMENTS = {
+    ai_win: [
+      "[Minimax Mode] Checkmate! Optimal mathematical victory.",
+      "[Minimax Mode] Calculated to absolute perfection. Better luck next time!",
+      "[Minimax Mode] Another victory for silicon over carbon."
+    ],
+    human_win: [
+      "[Minimax Mode] Beginner's luck! I demand a rematch.",
+      "[Minimax Mode] Enjoy your fleeting moment in the sun!",
+      "[Minimax Mode] A minor anomaly. Won't happen next round."
+    ],
+    draw: [
+      "[Minimax Mode] A stalemate... you survived this round against Minimax.",
+      "[Minimax Mode] A draw? I call that tactical offline mercy.",
+      "[Minimax Mode] Gridlock. Let's see if you can do better next round."
+    ]
+  };
+
+  /* ================= AUDIO SYNTH ================= */
+  let soundEnabled = true;
+  let audioCtx = null;
+
+  function playTone(freq, duration = 0.08, type = 'sine') {
+    if (!soundEnabled) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    } catch (_) {}
+  }
+
+  /* ================= STATE & PROVIDERS ================= */
+  let mode = 'ai'; // 'ai' or '2p'
+  let board = Array(9).fill(null);
+  let current = 'X';
+  let gameOver = false;
+  let isAiThinking = false;
+  
+  // AI Provider state: 'local' | 'webllm' | 'window.ai' | 'fallback'
+  let activeProvider = 'fallback';
+  let webllmEngine = null;
+  let windowAiSession = null;
+  let localServerOnline = false;
+
+  const scores = { X: 0, O: 0, draw: 0 };
+  const chatHistory = [];
+
+  /* ================= DOM ELEMENTS ================= */
+  const boardEl = document.getElementById('board');
+  const statusEl = document.getElementById('status');
+  const scoreXEl = document.getElementById('score-x');
+  const scoreOEl = document.getElementById('score-o');
+  const scoreDrawEl = document.getElementById('score-draw');
+  const labelXEl = document.getElementById('label-x');
+  const labelOEl = document.getElementById('label-o');
+  const modeAiBtn = document.getElementById('mode-ai');
+  const mode2pBtn = document.getElementById('mode-2p');
+  const newRoundBtn = document.getElementById('new-round');
+  const resetAllBtn = document.getElementById('reset-all');
+  const chatMessagesEl = document.getElementById('chat-messages');
+  const typingIndicatorEl = document.getElementById('typing-indicator');
+  const chatForm = document.getElementById('chat-form');
+  const chatInput = document.getElementById('chat-input');
+  const aiAvatarEl = document.getElementById('ai-avatar-el');
+  const aiDisplayName = document.getElementById('ai-display-name');
+  const serverStatusDot = document.getElementById('server-status-dot');
+  const serverStatusText = document.getElementById('server-status-text');
+  const loadInBrowserBtn = document.getElementById('load-inbrowser-btn');
+  const progressBarWrap = document.getElementById('progress-bar-wrap');
+  const progressText = document.getElementById('progress-text');
+  const progressFill = document.getElementById('progress-fill');
+  const activeEngineLabel = document.getElementById('active-engine-label');
+  const soundToggleBtn = document.getElementById('toggle-sound');
+  let cells = [];
+
+  /* ================= CORE LOGIC ================= */
+  function checkWinner(b) {
+    for (const line of WINNING_LINES) {
+      const [a, c, d] = line;
+      if (b[a] && b[a] === b[c] && b[a] === b[d]) {
+        return { winner: b[a], line };
+      }
+    }
+    return null;
+  }
+
+  function isBoardFull(b) {
+    return b.every(cell => cell !== null && cell !== '');
+  }
+
+  function getAvailableMoves(b) {
+    const moves = [];
+    for (let i = 0; i < 9; i++) {
+      if (!b[i]) moves.push(i);
+    }
+    return moves;
+  }
+
+  function minimax(b, depth, isMaximizing, aiSymbol = 'O', humanSymbol = 'X') {
+    const win = checkWinner(b);
+    if (win) {
+      return win.winner === aiSymbol ? 10 - depth : depth - 10;
+    }
+    if (isBoardFull(b)) return 0;
+
+    if (isMaximizing) {
+      let bestScore = -Infinity;
+      for (let i = 0; i < 9; i++) {
+        if (!b[i]) {
+          b[i] = aiSymbol;
+          const score = minimax(b, depth + 1, false, aiSymbol, humanSymbol);
+          b[i] = null;
+          bestScore = Math.max(score, bestScore);
+        }
+      }
+      return bestScore;
+    } else {
+      let bestScore = Infinity;
+      for (let i = 0; i < 9; i++) {
+        if (!b[i]) {
+          b[i] = humanSymbol;
+          const score = minimax(b, depth + 1, true, aiSymbol, humanSymbol);
+          b[i] = null;
+          bestScore = Math.min(score, bestScore);
+        }
+      }
+      return bestScore;
+    }
+  }
+
+  function getBestMinimaxMove(b, aiSymbol = 'O', humanSymbol = 'X') {
+    const available = getAvailableMoves(b);
+    if (available.length === 0) return -1;
+    if (available.length === 9) {
+      const openers = [0, 2, 4, 6, 8];
+      return openers[Math.floor(Math.random() * openers.length)];
+    }
+
+    let bestMove = available[0];
+    let bestScore = -Infinity;
+
+    for (const move of available) {
+      b[move] = aiSymbol;
+      const score = minimax(b, 0, false, aiSymbol, humanSymbol);
+      b[move] = null;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = move;
+      }
+    }
+    return bestMove;
+  }
+
+  function parseLLMMoveResponse(rawContent, availableMoves) {
+    if (!rawContent || typeof rawContent !== 'string') return null;
+    let cleaned = rawContent.trim();
+    const codeBlock = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (codeBlock) cleaned = codeBlock[1].trim();
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) cleaned = jsonMatch[0];
+
+    try {
+      const parsed = JSON.parse(cleaned);
+      let move = Number(parsed.move);
+      if (!Number.isInteger(move) || !availableMoves.includes(move)) {
+        return null;
+      }
+      const comment = typeof parsed.comment === 'string' && parsed.comment.trim()
+        ? parsed.comment.trim()
+        : "Your move.";
+      return { move, comment };
+    } catch {
+      return null;
+    }
+  }
+
+  /* ================= AI INFERENCE ROUTER ================= */
+  async function generateAIReply(messages, maxTokens = 80) {
+    // 1. Try In-Browser WebLLM if loaded
+    if (activeProvider === 'webllm' && webllmEngine) {
+      try {
+        const res = await webllmEngine.chat.completions.create({
+          messages,
+          max_tokens: maxTokens,
+          temperature: 0.8
+        });
+        return res.choices[0].message.content.trim();
+      } catch (e) {
+        console.warn('WebLLM call failed, falling back:', e);
+      }
+    }
+
+    // 2. Try Chrome Built-in window.ai if available
+    if (activeProvider === 'window.ai' && windowAiSession) {
+      try {
+        const lastMsg = messages[messages.length - 1].content;
+        const res = await windowAiSession.prompt(lastMsg);
+        return res.trim();
+      } catch (e) {
+        console.warn('window.ai call failed:', e);
+      }
+    }
+
+    // 3. Try Local LLM Server if online
+    if (activeProvider === 'local' || localServerOnline) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), CONFIG.timeoutMs);
+      try {
+        const response = await fetch(CONFIG.localApiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: CONFIG.localModelName,
+            messages,
+            max_tokens: maxTokens,
+            temperature: 0.8,
+            chat_template_kwargs: { enable_thinking: false }
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (response.ok) {
+          const data = await response.json();
+          const text = data?.choices?.[0]?.message?.content;
+          if (text) return text.trim();
+        }
+      } catch (_) {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    // Fallback: throw so caller uses canned offline quips
+    throw new Error('No live LLM engine reachable');
+  }
+
+  /* ================= PROVIDER INITIALIZERS ================= */
+  async function initInBrowserWebLLM() {
+    loadInBrowserBtn.disabled = true;
+    loadInBrowserBtn.textContent = "⏳ Loading...";
+    progressBarWrap.classList.add('active');
+    progressText.textContent = "Importing WebLLM engine from CDN...";
+    progressFill.style.width = "10%";
+
+    try {
+      const webllm = await import("https://esm.run/@mlc-ai/web-llm");
+      progressText.textContent = "Streaming SmolLM2 from Hugging Face CDN (0 egress)...";
+      progressFill.style.width = "25%";
+
+      const engine = await webllm.CreateMLCEngine(CONFIG.webllmModelName, {
+        initProgressCallback: (report) => {
+          progressText.textContent = report.text || "Loading model weights...";
+          if (typeof report.progress === 'number') {
+            const pct = Math.round(report.progress * 100);
+            progressFill.style.width = `${Math.max(25, pct)}%`;
+          }
+        }
+      });
+
+      webllmEngine = engine;
+      activeProvider = 'webllm';
+      progressBarWrap.classList.remove('active');
+      loadInBrowserBtn.style.display = 'none';
+      
+      updateProviderUI('webllm', 'SmolLM2-360M (In-Browser WebGPU • 0 Homelab Egress)');
+      addChatMessage('system', '⚡ In-browser WebLLM loaded successfully! Model weights cached in browser.', true);
+    } catch (err) {
+      console.error('WebLLM init failed:', err);
+      progressBarWrap.classList.remove('active');
+      loadInBrowserBtn.disabled = false;
+      loadInBrowserBtn.textContent = "❌ Failed (Retry)";
+      addChatMessage('system', '⚠️ Could not load in-browser WebLLM. Using instant Minimax engine.', true);
+    }
+  }
+
+  async function detectProviders() {
+    // 1. Check Chrome Built-in AI (window.ai)
+    if (window.ai && window.ai.languageModel) {
+      try {
+        const capabilities = await window.ai.languageModel.capabilities();
+        if (capabilities.available !== 'no') {
+          windowAiSession = await window.ai.languageModel.create();
+          activeProvider = 'window.ai';
+          updateProviderUI('window.ai', 'Chrome Built-in Gemini Nano (0 Download)');
+          return;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Check local server (127.0.0.1:8000)
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      const res = await fetch(CONFIG.localModelsEndpoint, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        localServerOnline = true;
+        activeProvider = 'local';
+        updateProviderUI('local', 'Local Server (Qwen 3.8-27B)');
+        return;
+      }
+    } catch (_) {}
+
+    // 3. Default: Instant Minimax + prompt to load in-browser AI
+    activeProvider = 'fallback';
+    updateProviderUI('fallback', 'Minimax Engine + Canned Trash Talk (0 KB Egress)');
+  }
+
+  function updateProviderUI(provider, desc) {
+    if (provider === 'webllm' || provider === 'local' || provider === 'window.ai') {
+      serverStatusDot.className = 'status-dot';
+      serverStatusText.textContent = `Online (${provider === 'webllm' ? 'WebLLM WebGPU' : provider === 'window.ai' ? 'Gemini Nano' : 'Local oMLX'})`;
+      aiAvatarEl.className = 'ai-avatar';
+      aiDisplayName.textContent = provider === 'webllm' ? 'SmolLM2 Browser AI' : provider === 'window.ai' ? 'Gemini Nano' : 'Qwen 3.8';
+      activeEngineLabel.textContent = `Active Engine: ${desc}`;
+    } else {
+      serverStatusDot.className = 'status-dot offline';
+      serverStatusText.textContent = 'Minimax Engine (Instant • 0 Egress)';
+      aiAvatarEl.className = 'ai-avatar offline';
+      aiDisplayName.textContent = 'Minimax AI';
+      activeEngineLabel.textContent = `Active Engine: ${desc}`;
+    }
+  }
+
+  /* ================= CHAT UI HELPERS ================= */
+  function addChatMessage(sender, text, isSystem = false, isOffline = false) {
+    const msgEl = document.createElement('div');
+    msgEl.className = `chat-message ${isSystem ? 'system' : sender.toLowerCase()} ${isOffline ? 'is-offline' : ''}`;
+
+    if (!isSystem) {
+      const senderEl = document.createElement('div');
+      senderEl.className = 'message-sender';
+      
+      if (sender === 'user') {
+        senderEl.textContent = 'You';
+      } else {
+        const isFallback = activeProvider === 'fallback' || isOffline;
+        senderEl.innerHTML = `${aiDisplayName.textContent} ${isFallback ? '<span class="offline-tag">Minimax Mode</span>' : ''}`;
+      }
+      msgEl.appendChild(senderEl);
+    }
+
+    const bubbleEl = document.createElement('div');
+    bubbleEl.className = 'message-bubble';
+    bubbleEl.textContent = text;
+    msgEl.appendChild(bubbleEl);
+
+    chatMessagesEl.appendChild(msgEl);
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+
+    if (!isSystem) {
+      chatHistory.push({ sender, text });
+      if (chatHistory.length > 20) chatHistory.shift();
+    }
+  }
+
+  function showTyping(show) {
+    if (show) {
+      typingIndicatorEl.classList.add('active');
+      chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+    } else {
+      typingIndicatorEl.classList.remove('active');
+    }
+  }
+
+  /* ================= GAME FLOW ================= */
+  function renderStatus() {
+    if (gameOver) return;
+    if (mode === 'ai' && current === 'O') {
+      statusEl.innerHTML = `AI Turn: <span class="turn-o">${activeProvider !== 'fallback' ? 'Thinking...' : 'Minimax calculating...'}</span>`;
+    } else {
+      statusEl.innerHTML = `Turn: <span class="turn-${current.toLowerCase()}">${current}</span>`;
+    }
+  }
+
+  function updateScores() {
+    scoreXEl.textContent = scores.X;
+    scoreOEl.textContent = scores.O;
+    scoreDrawEl.textContent = scores.draw;
+  }
+
+  function newRound() {
+    board = Array(9).fill(null);
+    current = 'X';
+    gameOver = false;
+    isAiThinking = false;
+    showTyping(false);
+
+    cells.forEach(c => {
+      c.textContent = '';
+      c.className = 'cell';
+      c.disabled = false;
+    });
+
+    renderStatus();
+    playTone(520, 0.05);
+  }
+
+  function resetAll() {
+    scores.X = 0;
+    scores.O = 0;
+    scores.draw = 0;
+    updateScores();
+    newRound();
+  }
+
+  async function handleGameEnd(win, isDraw) {
+    gameOver = true;
+    cells.forEach(c => (c.disabled = true));
+
+    if (win) {
+      win.line.forEach(idx => cells[idx].classList.add('win'));
+      scores[win.player]++;
+      updateScores();
+
+      if (mode === 'ai') {
+        const isAiWinner = win.player === 'O';
+        statusEl.innerHTML = `<span class="winner">${isAiWinner ? 'AI' : 'You'} Won!</span>`;
+        playTone(isAiWinner ? 300 : 700, 0.25, 'triangle');
+        
+        triggerEndgameReaction(isAiWinner ? 'ai_win' : 'human_win');
+      } else {
+        statusEl.innerHTML = `<span class="winner">Player ${win.player} Wins!</span>`;
+        playTone(650, 0.2, 'triangle');
+      }
+    } else if (isDraw) {
+      scores.draw++;
+      updateScores();
+      statusEl.textContent = "It's a draw!";
+      playTone(400, 0.15);
+
+      if (mode === 'ai') {
+        triggerEndgameReaction('draw');
+      }
+    }
+  }
+
+  async function triggerEndgameReaction(outcome) {
+    showTyping(true);
+    const systemPrompt = `You are a boastful, dramatic Tic-Tac-Toe AI. The game just finished.
+Give a single punchy, hilarious reaction sentence (${outcome === 'ai_win' ? 'bragging about your genius' : outcome === 'human_win' ? 'making a funny excuse or demanding a rematch' : 'commenting on the stalemate'}).`;
+
+    const outcomeDesc = outcome === 'ai_win' ? 'You (O) won against Human (X)' : outcome === 'human_win' ? 'Human (X) defeated you (O)' : 'Game tied/drawn';
+    const userPrompt = `Game Result: ${outcomeDesc}\nFinal board: ${JSON.stringify(board)}`;
+
+    try {
+      const response = await generateAIReply([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ], 60);
+      showTyping(false);
+      addChatMessage('ai', response, false, false);
+    } catch {
+      showTyping(false);
+      const fallbacks = FALLBACK_ENDGAME_COMMENTS[outcome];
+      const randomMsg = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+      addChatMessage('ai', randomMsg, false, true);
+    }
+  }
+
+  async function onCellClick(i) {
+    if (gameOver || board[i] || isAiThinking) return;
+
+    // Apply human move
+    board[i] = current;
+    const cell = cells[i];
+    cell.textContent = current;
+    cell.classList.add(current.toLowerCase(), 'pop');
+    cell.disabled = true;
+    playTone(current === 'X' ? 440 : 554, 0.08);
+
+    const win = checkWinner(board);
+    if (win || isBoardFull(board)) {
+      handleGameEnd(win, !win && isBoardFull(board));
+      return;
+    }
+
+    current = current === 'X' ? 'O' : 'X';
+    renderStatus();
+
+    if (mode === 'ai' && current === 'O') {
+      await makeAiMove(i);
+    }
+  }
+
+  async function makeAiMove(lastHumanMove) {
+    isAiThinking = true;
+    renderStatus();
+    showTyping(true);
+
+    const availableMoves = getAvailableMoves(board);
+    if (availableMoves.length === 0) {
+      isAiThinking = false;
+      showTyping(false);
+      return;
+    }
+
+    // Minimax is ALWAYS used for the optimal move calculation (0 KB, < 1ms)
+    const chosenMove = getBestMinimaxMove(board, 'O', 'X');
+
+    // Generate in-character trash-talk commentary via available AI provider
+    const formattedBoard = board.map((v, idx) => v === null ? `${idx}` : v);
+    const systemPrompt = `You are a witty, boastful, trash-talking Tic-Tac-Toe AI champion playing as 'O' against human 'X'.
+React to the human move at square ${lastHumanMove} and your move at square ${chosenMove} with 1 short, hilarious trash-talk sentence.`;
+
+    const userPrompt = `Board: ${JSON.stringify(formattedBoard)}. Human played ${lastHumanMove}, you play ${chosenMove}. Talk trash!`;
+
+    let comment = null;
+    let isOfflineFallback = false;
+
+    try {
+      comment = await generateAIReply([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ], 60);
+    } catch {
+      isOfflineFallback = true;
+      comment = FALLBACK_TAKING_BREAK_MESSAGES[Math.floor(Math.random() * FALLBACK_TAKING_BREAK_MESSAGES.length)];
+    }
+
+    showTyping(false);
+    isAiThinking = false;
+
+    if (chosenMove !== null && board[chosenMove] === null) {
+      board[chosenMove] = 'O';
+      const cell = cells[chosenMove];
+      cell.textContent = 'O';
+      cell.classList.add('o', 'pop');
+      cell.disabled = true;
+      playTone(330, 0.08);
+
+      if (comment) {
+        addChatMessage('ai', comment, false, isOfflineFallback);
+      }
+
+      const win = checkWinner(board);
+      if (win || isBoardFull(board)) {
+        handleGameEnd(win, !win && isBoardFull(board));
+        return;
+      }
+
+      current = 'X';
+      renderStatus();
+    }
+  }
+
+  /* ================= USER IN-GAME CHAT ================= */
+  async function handleUserChat(message) {
+    if (!message || !message.trim()) return;
+    const text = message.trim();
+    chatInput.value = '';
+
+    addChatMessage('user', text);
+    playTone(600, 0.04);
+
+    if (mode !== 'ai') return;
+
+    showTyping(true);
+
+    const systemPrompt = `You are a witty, sassy, competitive Tic-Tac-Toe AI master playing as 'O' against human 'X'.
+The human is chatting with you during your match. Reply with a short, funny, boastful trash-talk retort (1-2 sentences). Keep it playful and sharp.`;
+
+    const messages = [{ role: 'system', content: systemPrompt }];
+    const recent = chatHistory.slice(-4);
+    for (const item of recent) {
+      messages.push({
+        role: item.sender === 'user' ? 'user' : 'assistant',
+        content: item.text
+      });
+    }
+    messages.push({
+      role: 'user',
+      content: `Board: ${JSON.stringify(board)}. Human says: "${text}"`
+    });
+
+    try {
+      const reply = await generateAIReply(messages, 80);
+      showTyping(false);
+      addChatMessage('ai', reply, false, false);
+      playTone(480, 0.06);
+    } catch {
+      showTyping(false);
+      const fallbackReply = FALLBACK_USER_CHAT_RESPONSES[Math.floor(Math.random() * FALLBACK_USER_CHAT_RESPONSES.length)];
+      addChatMessage('ai', fallbackReply, false, true);
+    }
+  }
+
+  /* ================= INITIALIZATION & LISTENERS ================= */
+  boardEl.innerHTML = '';
+  cells = Array.from({ length: 9 }, (_, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'cell';
+    btn.setAttribute('aria-label', `Cell ${i + 1}`);
+    btn.addEventListener('click', () => onCellClick(i));
+    boardEl.appendChild(btn);
+    return btn;
+  });
+
+  function setMode(newMode) {
+    mode = newMode;
+    if (mode === 'ai') {
+      modeAiBtn.classList.add('active');
+      modeAiBtn.setAttribute('aria-checked', 'true');
+      mode2pBtn.classList.remove('active');
+      mode2pBtn.setAttribute('aria-checked', 'false');
+      labelXEl.textContent = 'Player (X)';
+      labelOEl.textContent = 'AI (O)';
+      addChatMessage('ai', "I'm ready. Make your first move!", false, activeProvider === 'fallback');
+    } else {
+      mode2pBtn.classList.add('active');
+      mode2pBtn.setAttribute('aria-checked', 'true');
+      modeAiBtn.classList.remove('active');
+      modeAiBtn.setAttribute('aria-checked', 'false');
+      labelXEl.textContent = 'Player 1 (X)';
+      labelOEl.textContent = 'Player 2 (O)';
+      addChatMessage('system', "Switched to 2-Player Local Mode.", true);
+    }
+    newRound();
+  }
+
+  modeAiBtn.addEventListener('click', () => setMode('ai'));
+  mode2pBtn.addEventListener('click', () => setMode('2p'));
+
+  newRoundBtn.addEventListener('click', newRound);
+  resetAllBtn.addEventListener('click', resetAll);
+
+  chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleUserChat(chatInput.value);
+  });
+
+  document.querySelectorAll('.chip-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      handleUserChat(btn.dataset.text);
+    });
+  });
+
+  loadInBrowserBtn.addEventListener('click', initInBrowserWebLLM);
+
+  soundToggleBtn.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    soundToggleBtn.textContent = soundEnabled ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+  });
+
+  addChatMessage('ai', "Welcome to the arena! Let's see if you can even manage a draw.");
+
+  detectProviders();
+  newRound();
+})();
+</script>
+</body>
+</html>

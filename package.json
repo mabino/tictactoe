@@ -1,0 +1,23 @@
+{
+  "name": "tictactoe-ai",
+  "version": "1.0.0",
+  "description": "Tic-Tac-Toe web game with local LLM AI opponent (omlx / Qwen 3.8-27B) and trash-talk chat",
+  "main": "src/game-engine.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:unit": "node --test test/game-engine.test.js",
+    "test:integration": "node --test test/api-integration.test.js",
+    "start": "python3 -m http.server 8080"
+  },
+  "keywords": [
+    "tic-tac-toe",
+    "ai",
+    "llm",
+    "omlx",
+    "mlx",
+    "qwen"
+  ],
+  "author": "",
+  "license": "MIT"
+}
